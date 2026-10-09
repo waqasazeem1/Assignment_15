@@ -317,3 +317,62 @@ README.md
 
 main.py
 : Rich terminal interface with interactive chat, single query CLI, and automated demo. -->
+
+---
+
+## 💻 Localhost Setup & Running Guide
+
+Follow these simple steps to run the Multi-Agent System on your local computer:
+
+### Step 1: Terminal Khol kar Project Directory Mein Aayein
+Agar aap terminal / Command Prompt open kar rahe hain:
+```powershell
+cd "e:\New folder"
+```
+
+### Step 2: Virtual Environment Activate Karein
+Is project ki tamam dependencies `.venv` ke andar installed hain:
+```powershell
+# Windows (PowerShell)
+.venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
+```
+*(Jab activate ho jaye to terminal prompt par shuru mein `(.venv)` show hoga).*
+
+> **Note (Fresh Machine Setup):** Agar aap kisi naye computer par run kar rahe hon jahan `.venv` maujood na ho:
+> ```powershell
+> python -m venv .venv
+> .venv\Scripts\activate
+> pip install -r requirements.txt
+> ```
+
+### Step 3: Environment Variables Check Karein (`.env`)
+Project root mein `.env` file template `.env.example` ke mutabiq hoti hai:
+- `OPENAI_API_KEY`: *(Optional)* Live OpenAI key. Agar na ho to intelligent sandbox automatically active hota hai.
+- `GMAIL_SENDER_EMAIL`: Aapka sender Gmail address.
+- `GMAIL_APP_PASSWORD`: Google 16-character App Password (from [Google App Passwords](https://myaccount.google.com/apppasswords)).
+- `SMTP_SERVER`: `smtp.gmail.com`
+- `SMTP_PORT`: `587`
+
+### Step 4: Server Start Karein
+Terminal mein server run karein:
+```powershell
+python server.py
+```
+Aapko console par yeh message nazar aayega:
+```text
+Starting LangGraph Multi-Agent Server on http://0.0.0.0:8000 ...
+INFO:     Started server process
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+### Step 5: Browser Mein Application Open Karein
+Browser mein yeh URL open karein:
+👉 **[http://localhost:8000](http://localhost:8000)** (ya **http://127.0.0.1:8000**)
+
+*(Server ko band karne ke liye terminal mein `Ctrl + C` dabayein).*
+
