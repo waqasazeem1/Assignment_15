@@ -1,0 +1,32 @@
+# LangGraph & Core Orchestration
+langgraph>=1.2.0
+langchain>=1.4.0
+langchain-core>=1.6.0
+langchain-community>=0.4.0
+langchain-openai>=1.6.0
+
+# Vector Database & Document Processing (STEP 1: RAG)
+langchain-chroma>=1.1.0
+chromadb>=1.5.0
+pypdf>=6.19.0
+reportlab>=5.0.0
+pillow>=12.0.0
+
+# Model Context Protocol (STEP 2, 3, 4: MCP)
+mcp>=2.3.0
+mcp-types>=2.3.0
+
+# Google Workspace APIs (STEP 3 & STEP 4: Calendar & Gmail)
+google-api-python-client>=2.200.0
+google-auth-httplib2>=0.4.0
+google-auth-oauthlib>=1.5.0
+
+# HTTP & API Clients (STEP 2: GitHub)
+requests>=2.32.0
+httpx>=0.28.0
+
+# Utilities, Console UI & Environment
+pydantic>=2.10.0
+pydantic-settings>=2.10.0
+python-dotenv>=1.2.0
+rich>=15.0.0

@@ -1,0 +1,36 @@
+# ==============================================================================
+# Git Ignore Rules - Multi-Agent Architecture
+# ==============================================================================
+
+# Sensitive Environment Variables & Passwords (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+
+# Virtual Environment (Heavy dependencies)
+.venv/
+venv/
+env/
+ENV/
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Google OAuth Credentials & Tokens (Sensitive)
+credentials.json
+token.json
+
+# ChromaDB Vector Store & Binary Indices
+data/chroma_db/
+chroma_db/
+*.sqlite3
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
