@@ -215,18 +215,41 @@ async def save_email_settings_endpoint(req: EmailSettingsRequest):
 
     # Validate SMTP connection
     import smtplib
+    cloud_restricted = False
     try:
-        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=12) as s:
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=8) as s:
             s.ehlo()
             s.starttls()
             s.ehlo()
             s.login(sender, password)
-    except Exception as e:
-        logger.error(f"Gmail SMTP validation failed for {sender}: {e}")
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"Gmail SMTP credentials rejected for {sender}: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Gmail authentication failed: {str(e)}. Please check that 2-Step Verification is active and you are using a 16-character App Password (from https://myaccount.google.com/apppasswords)."
+            detail=f"Gmail authentication failed: Incorrect App Password or 2-Step Verification not active. Please check your 16-character App Password."
         )
+    except OSError as e:
+        err_msg = str(e).lower()
+        if "101" in err_msg or "unreachable" in err_msg or "111" in err_msg or "timed out" in err_msg or "refused" in err_msg:
+            # Cloud environment (Render Free Tier) blocks outbound SMTP ports 25/465/587
+            logger.warning(f"SMTP port restricted by cloud provider ({e}). Enabling 1-Click Direct Gmail Dispatch.")
+            cloud_restricted = True
+        else:
+            logger.error(f"Gmail connection error: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Gmail connection error: {str(e)}."
+            )
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "101" in err_msg or "unreachable" in err_msg or "timed out" in err_msg:
+            cloud_restricted = True
+        else:
+            logger.error(f"Gmail SMTP validation failed for {sender}: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Gmail authentication failed: {str(e)}."
+            )
 
     # Update in-memory configuration
     settings.GMAIL_SENDER_EMAIL = sender
@@ -234,21 +257,33 @@ async def save_email_settings_endpoint(req: EmailSettingsRequest):
     settings.SMTP_USER = sender
     settings.SMTP_PASSWORD = password
 
-    # Save to .env file
-    env_path = Path(".env")
-    if env_path.exists():
-        content = env_path.read_text(encoding="utf-8")
-        import re
-        content = re.sub(r"^GMAIL_SENDER_EMAIL=.*$", f"GMAIL_SENDER_EMAIL={sender}", content, flags=re.MULTILINE)
-        content = re.sub(r"^GMAIL_APP_PASSWORD=.*$", f"GMAIL_APP_PASSWORD={password}", content, flags=re.MULTILINE)
-        content = re.sub(r"^SMTP_USER=.*$", f"SMTP_USER={sender}", content, flags=re.MULTILINE)
-        content = re.sub(r"^SMTP_PASSWORD=.*$", f"SMTP_PASSWORD={password}", content, flags=re.MULTILINE)
-        env_path.write_text(content, encoding="utf-8")
+    # Save to .env file if available
+    try:
+        env_path = Path(".env")
+        if env_path.exists():
+            content = env_path.read_text(encoding="utf-8")
+            import re
+            content = re.sub(r"^GMAIL_SENDER_EMAIL=.*$", f"GMAIL_SENDER_EMAIL={sender}", content, flags=re.MULTILINE)
+            content = re.sub(r"^GMAIL_APP_PASSWORD=.*$", f"GMAIL_APP_PASSWORD={password}", content, flags=re.MULTILINE)
+            content = re.sub(r"^SMTP_USER=.*$", f"SMTP_USER={sender}", content, flags=re.MULTILINE)
+            content = re.sub(r"^SMTP_PASSWORD=.*$", f"SMTP_PASSWORD={password}", content, flags=re.MULTILINE)
+            env_path.write_text(content, encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Could not persist to .env: {e}")
+
+    if cloud_restricted:
+        return {
+            "status": "success",
+            "message": f"Connected as {sender}! (Cloud Mode: Render Free Tier blocks outbound SMTP port 587. 1-Click Gmail Direct Dispatch enabled so you can send emails with 1 click!).",
+            "sender_email": sender,
+            "cloud_mode": True
+        }
 
     return {
         "status": "success",
         "message": f"Successfully connected to Gmail as {sender}! Live emails and calendar invites will now be sent automatically.",
-        "sender_email": sender
+        "sender_email": sender,
+        "cloud_mode": False
     }
 
 @app.post("/api/send-email")

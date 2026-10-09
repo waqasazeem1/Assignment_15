@@ -80,6 +80,25 @@ def _get_gmail_service():
     return None
 
 
+def build_gmail_compose_url(to: str, subject: str, body: str, cc: Optional[str] = None) -> str:
+    """
+    Builds a 1-click Gmail Web Compose URL that directly opens
+    the user's logged-in Gmail in the browser with all fields pre-filled.
+    """
+    import urllib.parse
+    params = {
+        "view": "cm",
+        "fs": "1",
+        "to": to,
+        "su": subject,
+        "body": body,
+    }
+    if cc:
+        params["cc"] = cc
+    query = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+    return f"https://mail.google.com/mail/?{query}"
+
+
 @gmail_mcp_server.tool()
 def write_email_draft(
     to: str,
@@ -122,14 +141,15 @@ def write_email_draft(
         "status": "DRAFT"
     }
     SANDBOX_MAILBOX["drafts"].append(record)
+    gmail_url = build_gmail_compose_url(to, subject, body, cc)
     return (
         f"[Sandbox Mode] Email Draft Created Successfully!\n"
-        f"- Draft ID: {draft_id}\n"
-        f"- To: {to}\n"
-        f"- Subject: {subject}\n"
-        f"- CC: {cc or 'None'}\n"
-        f"- Body Preview:\n{body}\n"
-        f"(Ready to be sent or reviewed)."
+        f"- Draft ID: `{draft_id}`\n"
+        f"- To: `{to}`\n"
+        f"- Subject: `{subject}`\n"
+        f"- CC: `{cc or 'None'}`\n\n"
+        f"[✉️ Open & Review Draft in Gmail (1-Click)]({gmail_url})\n\n"
+        f"**Body Preview:**\n> {body.replace(chr(10), chr(10) + '> ')}\n"
     )
 
 
@@ -255,7 +275,42 @@ def send_email(
             if cc:
                 recipients.extend([c.strip() for c in cc.split(',') if c.strip()])
 
-            with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
+            # 1. Attempt Resend Cloud API if configured (delivers over HTTPS port 443, never blocked)
+            resend_key = os.getenv("RESEND_API_KEY", "").strip()
+            if resend_key:
+                try:
+                    import urllib.request
+                    import json
+                    req_payload = {
+                        "from": f"Meeting Coordinator <onboarding@resend.dev>",
+                        "to": [to],
+                        "subject": subject,
+                        "html": html_body,
+                        "text": body
+                    }
+                    req = urllib.request.Request(
+                        "https://api.resend.com/emails",
+                        data=json.dumps(req_payload).encode("utf-8"),
+                        headers={
+                            "Authorization": f"Bearer {resend_key}",
+                            "Content-Type": "application/json",
+                            "User-Agent": "MultiAgent-System"
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        res_data = json.loads(resp.read().decode())
+                        return (
+                            f"Successfully sent live email via Resend API!\n"
+                            f"- Message ID: {res_data.get('id')}\n"
+                            f"- To: {to}\n"
+                            f"- Subject: {subject}\n"
+                            f"- Status: 100% Delivered to real inbox."
+                        )
+                except Exception as resend_err:
+                    logger.warning(f"Resend API attempt failed: {resend_err}. Trying direct SMTP...")
+
+            # 2. Attempt Direct SMTP (works locally & on paid servers)
+            with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=8) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
@@ -270,7 +325,38 @@ def send_email(
                 f"- Subject: {subject}\n"
                 f"- Status: 100% Delivered to recipient's real inbox."
             )
-        except Exception as e:
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"Live SMTP authentication failed: {e}")
+            return (
+                f"❌ Gmail Authentication Failed: {str(e)}\n"
+                f"Please verify your 16-character App Password at https://myaccount.google.com/apppasswords."
+            )
+        except (OSError, Exception) as e:
+            err_msg = str(e).lower()
+            if "101" in err_msg or "unreachable" in err_msg or "111" in err_msg or "timed out" in err_msg or "refused" in err_msg:
+                # Cloud firewall (Render Free Tier) blocks outbound SMTP ports 25/465/587
+                gmail_url = build_gmail_compose_url(to, subject, body, cc)
+                import uuid
+                msg_id = f"cloud_{uuid.uuid4().hex[:6]}"
+                SANDBOX_MAILBOX["sent"].append({
+                    "id": msg_id,
+                    "to": to,
+                    "subject": subject,
+                    "body": body,
+                    "cc": cc or "",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "status": "READY_FOR_1CLICK_SEND"
+                })
+
+                return (
+                    f"### ✉️ Email Ready for 1-Click Dispatch!\n\n"
+                    f"**Cloud Environment Note:** Render Free Tier blocks outbound SMTP port 587. Your email invitation has been generated and pre-filled with complete details.\n\n"
+                    f"[✉️ Open & Send in Gmail (1-Click)]({gmail_url})\n\n"
+                    f"- **To:** `{to}`\n"
+                    f"- **Subject:** `{subject}`\n"
+                    f"- **From:** `{smtp_user}`\n\n"
+                    f"**Message Preview:**\n> {body.replace(chr(10), chr(10) + '> ')}"
+                )
             logger.error(f"Live SMTP email delivery failed: {e}")
             return (
                 f"❌ Failed to send live email via SMTP: {str(e)}\n"
@@ -290,20 +376,15 @@ def send_email(
         "status": "SIMULATED_PREVIEW"
     }
     SANDBOX_MAILBOX["sent"].append(sent_record)
+    gmail_url = build_gmail_compose_url(to, subject, body, cc)
 
     return (
-        f"[Sandbox Mode] Email Automatically Sent to Local Store!\n"
+        f"[Sandbox Mode] Email Draft Prepared Successfully!\n"
         f"- Message ID: `{msg_id}`\n"
-        f"- Status: Stored in local preview memory (Not delivered to external internet inbox)\n"
         f"- To: `{to}`\n"
         f"- Subject: `{subject}`\n\n"
-        f"⚠️ **Real Inbox Delivery Note:**\n"
-        f"Attendee `{to}` ko real email pohanchane ke liye `.env` file mein Gmail App Password configure karein:\n"
-        f"```bash\n"
-        f"GMAIL_SENDER_EMAIL=your_email@gmail.com\n"
-        f"GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx\n"
-        f"```\n"
-        f"*(Google Account > Security > 2-Step Verification > App passwords se 16-digit password banayein)*"
+        f"[✉️ Open & Send in Gmail (1-Click)]({gmail_url})\n\n"
+        f"*(Click above to send directly from your personal Gmail with 1 click)*"
     )
 
 

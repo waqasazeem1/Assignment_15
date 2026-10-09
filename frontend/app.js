@@ -175,6 +175,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (a.href && a.href.includes("calendar.google.com")) {
           a.classList.add("gcal-btn");
         }
+        if (a.href && a.href.includes("mail.google.com")) {
+          a.classList.add("gmail-btn");
+        }
       });
       renderedHtml = tempDiv.innerHTML;
     } catch (_) {}
