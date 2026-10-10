@@ -361,5 +361,11 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"\nStarting LangGraph Multi-Agent Server on http://{host}:{port} ...")
+    print("\n" + "="*60)
+    print("  🚀 LangGraph Multi-Agent Server Started Successfully!")
+    print(f"  👉 Web Interface:  http://localhost:{port}")
+    print(f"  👉 Localhost IP:   http://127.0.0.1:{port}")
+    print(f"  👉 API Docs:       http://localhost:{port}/docs")
+    print("="*60 + "\n")
     uvicorn.run("server:app", host=host, port=port, reload=False)
+

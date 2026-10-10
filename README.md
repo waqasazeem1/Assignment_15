@@ -1,8 +1,3 @@
-# 🌐 Live Deployed Application
-👉 **[https://multi-agent-system-fs38.onrender.com](https://multi-agent-system-fs38.onrender.com)**
-
-
-
 # LangGraph Multi-Agent Architecture: 1 Supervisor + 4 Sub-Agents
 
 An enterprise-grade, modular multi-agent system built using **LangGraph StateGraph**, **Model Context Protocol (MCP)**, and **ChromaDB**. The system features a centralized intelligent **Supervisor** that classifies user requests and delegates tasks to **four specialized sub-agents**.
